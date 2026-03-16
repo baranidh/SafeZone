@@ -1189,7 +1189,8 @@ function callsignToAirline(cs) {
 // Try one 2-hour window for a given callsign
 async function _tryWindow(callsign, begin, end) {
   const res = await fetch(
-    `https://opensky-network.org/api/flights/all?callsign=${encodeURIComponent(callsign)}&begin=${begin}&end=${end}`,
+    // OpenSky stores Mode S callsigns padded to 8 chars — must match exactly
+    `https://opensky-network.org/api/flights/all?callsign=${encodeURIComponent(callsign.padEnd(8))}&begin=${begin}&end=${end}`,
     { signal: AbortSignal.timeout(9000) }
   );
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
