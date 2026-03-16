@@ -1225,6 +1225,23 @@ async function fetchLiveState(icao24) {
   } catch { return null; }
 }
 
+// Fetch live aircraft from adsb.lol (broader coverage than OpenSky, incl. oceanic)
+// Returns the raw adsb.lol aircraft object, or null.
+async function fetchAdsbLol(callsign) {
+  const cs = callsign.replace(/\s+/g, '').toUpperCase();
+  try {
+    const res = await fetch(
+      `https://api.adsb.lol/v2/callsign/${cs}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const ac = data.ac?.[0];
+    if (!ac || ac.lat == null || ac.lon == null) throw new Error('no position');
+    return ac;
+  } catch { return null; }
+}
+
 // Resolve ICAO airport code → { lat, lng, name, iata } — local table first
 async function resolveIcaoToCoord(icao) {
   if (!icao) return null;
@@ -1259,53 +1276,78 @@ async function trackFlightNumber() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-  document.getElementById('fn-status').textContent = 'Step 1/3 — searching flight records…';
+  document.getElementById('fn-status').textContent = 'Searching OpenSky + ADS-B networks…';
   document.getElementById('fn-result-card').style.display = 'none';
   flightSearchGroup.clearLayers();
   _activeFlightSearch = null;
   _fnMarker = null;
 
   try {
-    // ── Step 1: find the flight record (48h dense + 10-day spot) ─
-    const record = await fetchFlightRecord(raw);
-    if (!record) {
+    // ── Fire OpenSky (route/history) + adsb.lol (live position) in parallel ──
+    // adsb.lol has broader coverage incl. oceanic routes; OpenSky is used for
+    // origin/dest which adsb.lol may not always carry.
+    const variants = normalizeCallsign(raw);
+
+    const [record, adsbAc] = await Promise.all([
+      fetchFlightRecord(raw),
+      Promise.any(variants.map(cs => fetchAdsbLol(cs))).catch(() => null),
+    ]);
+
+    if (!record && !adsbAc) {
       document.getElementById('fn-status').textContent =
-        '✖ Flight not found in last 10 days of OpenSky data. Try the ICAO callsign (e.g. UAE509 for EK509).';
-      showToast('Flight not found in OpenSky records', 'error');
+        `✖ "${raw.toUpperCase()}" not found in OpenSky or ADS-B networks. `
+        + `Flight may not be currently tracked (oceanic gap, or not yet departed).`;
+      showToast('Flight not found in any live source', 'error');
       return;
     }
 
-    const icao24  = record.icao24;
-    const oIcao   = record.estDepartureAirport || null;
-    const dIcao   = record.estArrivalAirport   || null;
-    const csFound = (record.callsign || raw).trim().toUpperCase();
+    // ── Merge best data from both sources ────────────────────────
+    const icao24  = record?.icao24  || adsbAc?.hex   || null;
+    const oIcao   = record?.estDepartureAirport || adsbAc?.from_icao || adsbAc?.orig_icao || null;
+    const dIcao   = record?.estArrivalAirport   || adsbAc?.to_icao   || adsbAc?.dest_icao || null;
+    const csFound = (record?.callsign || adsbAc?.flight || raw).trim().toUpperCase();
 
-    // Human-readable date of the last seen record
-    const lastSeenDate = record.lastSeen
+    const lastSeenDate = record?.lastSeen
       ? new Date(record.lastSeen * 1000).toUTCString().slice(0, 22) + ' UTC'
       : null;
 
-    document.getElementById('fn-status').textContent = 'Step 2/3 — fetching live position + airports…';
+    document.getElementById('fn-status').textContent = 'Resolving airports + drawing route…';
 
-    // ── Step 2: live state + airport coords in parallel ──────────
-    const [state, oCoord, dCoord] = await Promise.all([
-      fetchLiveState(icao24),
+    // ── Build live state: prefer adsb.lol (wider coverage), fall back to OpenSky ─
+    let state = null;
+    if (adsbAc && adsbAc.lat != null) {
+      // Normalise adsb.lol fields into the same positional array OpenSky uses
+      // [0]=icao24, [1]=callsign, [5]=lon, [6]=lat, [7]=alt_m, [9]=speed_ms, [10]=track
+      state = [
+        adsbAc.hex,
+        csFound,
+        null, null, null,
+        adsbAc.lon,
+        adsbAc.lat,
+        adsbAc.alt_baro != null ? adsbAc.alt_baro * 0.3048
+          : adsbAc.alt_geom != null ? adsbAc.alt_geom * 0.3048 : null,
+        null,
+        adsbAc.gs != null ? adsbAc.gs * 0.514444 : null,  // knots → m/s
+        adsbAc.track ?? null,
+      ];
+    } else if (icao24) {
+      state = await fetchLiveState(icao24);
+    }
+
+    const isAirborne = !!(state && state[6] != null && state[5] != null);
+    const lat     = isAirborne ? state[6]         : null;
+    const lng     = isAirborne ? state[5]         : null;
+    const altM    = isAirborne ? state[7]         : null;
+    const speedMs = isAirborne ? state[9]         : null;
+    const track   = isAirborne ? (state[10] ?? 0) : 0;
+    const dataSource = adsbAc ? 'ADS-B Exchange' : 'OpenSky';
+
+    // ── Resolve airports + draw route ───────────────────────────
+    const [oCoord, dCoord] = await Promise.all([
       resolveIcaoToCoord(oIcao),
       resolveIcaoToCoord(dIcao),
     ]);
 
-    const isAirborne = !!(state && state[6] != null && state[5] != null);
-
-    // Live position (only if airborne)
-    const lat      = isAirborne ? state[6]  : null;
-    const lng      = isAirborne ? state[5]  : null;
-    const altM     = isAirborne ? state[7]  : null;
-    const speedMs  = isAirborne ? state[9]  : null;
-    const track    = isAirborne ? (state[10] || 0) : 0;
-
-    document.getElementById('fn-status').textContent = 'Step 3/3 — drawing route…';
-
-    // ── Step 3: draw route whenever we have origin + destination ─
     let pts = null, routeIsReal = false, distKm = null, zones = [];
     if (oCoord && dCoord) {
       pts = await fetchRealRoute(oIcao, dIcao);
@@ -1350,7 +1392,7 @@ async function trackFlightNumber() {
           <div>Altitude: <span style="color:var(--text)">${altKm}</span></div>
           <div>Speed: <span style="color:var(--text)">${velKmh}</span></div>
           <div>Heading: <span style="color:var(--text)">${Math.round(track)}°</span></div>
-          <div style="color:var(--muted);margin-top:3px">ICAO24: ${icao24}</div>
+          <div style="color:var(--muted);margin-top:3px">ICAO24: ${icao24} · via ${dataSource}</div>
           ${routeIsReal ? `<div style="color:#4caf50;margin-top:3px">✔ Real IFR airways route</div>` : ''}
         </div>`);
       flightSearchGroup.addLayer(_fnMarker);
@@ -1370,7 +1412,9 @@ async function trackFlightNumber() {
 
     document.getElementById('fn-cs').textContent = csFound;
     document.getElementById('fn-airline').textContent =
-      airline + (isAirborne ? '' : (lastSeenDate ? `  ·  last seen ${lastSeenDate}` : '  ·  not currently airborne'));
+      airline + (isAirborne
+        ? `  ·  via ${dataSource}`
+        : (lastSeenDate ? `  ·  last seen ${lastSeenDate}` : '  ·  not currently airborne'));
 
     const oLabel = oCoord ? `<span class="fn-ap">${oCoord.iata}</span>` : (oIcao ? `<span class="fn-ap">${oIcao}</span>` : '');
     const dLabel = dCoord ? `<span class="fn-ap">${dCoord.iata}</span>` : (dIcao ? `<span class="fn-ap">${dIcao}</span>` : '<span style="color:var(--muted)">destination unknown</span>');
@@ -1389,7 +1433,7 @@ async function trackFlightNumber() {
     }
 
     const statusTag = isAirborne
-      ? `<span class="fn-tag fn-tag-ok">● Airborne</span>`
+      ? `<span class="fn-tag fn-tag-ok">● Airborne · ${dataSource}</span>`
       : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + lastSeenDate : ''}</span>`;
     const routeTag = pts
       ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : '~ Great circle'}</span>`
