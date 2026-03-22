@@ -1506,6 +1506,7 @@ async function trackFlightNumber() {
     let dIcao   = validRecord?.estArrivalAirport   || validAdsb?.to_icao   || validAdsb?.dest_icao || null;
     let csFound = (validRecord?.callsign || validAdsb?.flight || raw).trim().toUpperCase();
     let routeOnly = false;   // true when we only have a scheduled route, no live data
+    let routeSource = '';    // which source provided the route (for attribution)
 
     // If no validated live data, try AirLabs (paid) for live position,
     // then fall back to route-only sources (scheduled route, known routes).
@@ -1540,6 +1541,7 @@ async function trackFlightNumber() {
           dIcao = scheduled.dIcao;
           csFound = variants[0] || raw.toUpperCase();
           routeOnly = true;
+          routeSource = 'FlightPlanDB';
         } else {
           // Last resort: local known-routes database
           const known = lookupKnownRoute(raw);
@@ -1554,6 +1556,7 @@ async function trackFlightNumber() {
           dIcao = known.dIcao;
           csFound = variants[0] || raw.toUpperCase();
           routeOnly = true;
+          routeSource = 'known routes';
         }
       }
     }
@@ -1616,8 +1619,8 @@ async function trackFlightNumber() {
     const dataSource = validAdsb
       ? (validAdsb._source || 'ADS-B')
       : validRecord ? 'OpenSky'
-      : routeOnly ? 'Scheduled route'
-      : 'Unknown';
+      : routeOnly ? (routeSource || 'scheduled route')
+      : 'unknown';
 
     // ── Resolve airports + draw route ───────────────────────────
     const [oCoord, dCoord] = await Promise.all([
@@ -1691,8 +1694,8 @@ async function trackFlightNumber() {
     document.getElementById('fn-airline').textContent =
       airline + (isAirborne
         ? `  ·  via ${dataSource}`
-        : routeOnly ? '  ·  scheduled route'
-        : (lastSeenDate ? `  ·  last seen ${lastSeenDate}` : '  ·  not currently airborne'));
+        : routeOnly ? `  ·  scheduled route via ${dataSource}`
+        : (lastSeenDate ? `  ·  last seen ${lastSeenDate} · via ${dataSource}` : `  ·  not currently airborne · via ${dataSource}`));
 
     const oLabel = oCoord ? `<span class="fn-ap">${esc(oCoord.iata)}</span>` : (oIcao ? `<span class="fn-ap">${esc(oIcao)}</span>` : '');
     const dLabel = dCoord ? `<span class="fn-ap">${esc(dCoord.iata)}</span>` : (dIcao ? `<span class="fn-ap">${esc(dIcao)}</span>` : '<span style="color:var(--muted)">destination unknown</span>');
@@ -1714,8 +1717,8 @@ async function trackFlightNumber() {
     const statusTag = isAirborne
       ? `<span class="fn-tag fn-tag-ok">● Airborne · ${esc(dataSource)}</span>`
       : routeOnly
-        ? `<span class="fn-tag fn-tag-warn">◌ No live data · route only</span>`
-        : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
+        ? `<span class="fn-tag fn-tag-warn">◌ No live data · via ${esc(dataSource)}</span>`
+        : `<span class="fn-tag fn-tag-warn">⬛ On ground · via ${esc(dataSource)}${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
     const routeTag = pts
       ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : '~ Great circle'}</span>`
       : '';
@@ -1727,8 +1730,8 @@ async function trackFlightNumber() {
     document.getElementById('fn-result-card').style.display = 'block';
     document.getElementById('fn-status').textContent = !isAirborne && pts
       ? (routeOnly
-          ? `Scheduled route shown — flight is not currently tracked on any live feed.`
-          : `Route shown from last recorded operation${lastSeenDate ? ' (' + lastSeenDate + ')' : ''}.`)
+          ? `Scheduled route shown via ${dataSource} — flight is not currently tracked on any live feed.`
+          : `Route shown from last recorded operation via ${dataSource}${lastSeenDate ? ' (' + lastSeenDate + ')' : ''}.`)
       : '';
 
     _activeFlightSearch = { callsign: raw, icao24, lat, lng };
