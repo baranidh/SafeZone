@@ -567,7 +567,7 @@
 // ══════════════════════════════════════════════════════════════
 //  VERSION — increment on every pull request
 // ══════════════════════════════════════════════════════════════
-const APP_VERSION = 'v1.1.4';
+const APP_VERSION = 'v1.1.5';
 
 // ══════════════════════════════════════════════════════════════
 //  AIRPORTS
@@ -1654,12 +1654,36 @@ async function trackFlightNumber() {
       resolveIcaoToCoord(dIcao),
     ]);
 
-    let pts = null, routeIsReal = false, distKm = null, zones = [];
+    let pts = null, routeIsReal = false, routeFromKnown = false, distKm = null, zones = [];
     if (oCoord && dCoord) {
+      // Priority 1: Real IFR route from FlightPlanDB
       pts = await fetchRealRoute(oIcao, dIcao);
       routeIsReal = !!(pts && pts.length >= 2);
-      if (!pts || pts.length < 2) {
-        pts = greatCircle(oCoord.lat, oCoord.lng, dCoord.lat, dCoord.lng);
+
+      // Priority 2: Known routes — try fetching real IFR waypoints for known route airports
+      if (!routeIsReal) {
+        const known = lookupKnownRoute(raw);
+        if (known) {
+          // If known route has different airports, try FlightPlanDB with those
+          if (known.oIcao !== oIcao || known.dIcao !== dIcao) {
+            pts = await fetchRealRoute(known.oIcao, known.dIcao);
+            routeIsReal = !!(pts && pts.length >= 2);
+          }
+          if (!routeIsReal) {
+            // Use known route airports for great-circle line, but label as known route
+            routeFromKnown = true;
+            const knownO = await resolveIcaoToCoord(known.oIcao);
+            const knownD = await resolveIcaoToCoord(known.dIcao);
+            if (knownO && knownD) {
+              pts = greatCircle(knownO.lat, knownO.lng, knownD.lat, knownD.lng);
+            } else {
+              pts = greatCircle(oCoord.lat, oCoord.lng, dCoord.lat, dCoord.lng);
+            }
+          }
+        } else {
+          // Priority 3: Great circle — absolute last resort
+          pts = greatCircle(oCoord.lat, oCoord.lng, dCoord.lat, dCoord.lng);
+        }
       }
       zones = pathCrossesZones(pts);
       const highRisk = zones.some(z => z.level === 'high');
@@ -1746,7 +1770,7 @@ async function trackFlightNumber() {
         ? `<span class="fn-tag fn-tag-warn">◌ No live data · via ${esc(dataSource)}</span>`
         : `<span class="fn-tag fn-tag-warn">⬛ On ground · via ${esc(dataSource)}${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
     const routeTag = pts
-      ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : '~ Great circle'}</span>`
+      ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : routeFromKnown ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : routeFromKnown ? '✔ via known routes' : '~ Great circle'}</span>`
       : '';
     const riskTag = zones.length
       ? `<span class="fn-tag fn-tag-warn" style="margin-left:4px">⚠ ${zones.length} conflict zone${zones.length>1?'s':''}</span>`
