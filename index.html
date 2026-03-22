@@ -296,6 +296,45 @@
       }
     }
 
+    /* locate-me button */
+    #locate-me-btn {
+      position: fixed; bottom: 110px; right: 14px; z-index: 1000;
+      width: 42px; height: 42px; border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(10,16,34,.92); color: var(--text);
+      backdrop-filter: blur(10px); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+      transition: background .2s, color .2s;
+    }
+    #locate-me-btn:hover { background: rgba(0,212,255,.18); color: var(--accent); }
+    #locate-me-btn.active { color: #39ff82; border-color: #39ff82; }
+    #locate-me-btn.locating { animation: pulse-locate 1.2s infinite; }
+    @keyframes pulse-locate {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,212,255,.4); }
+      50% { box-shadow: 0 0 0 10px rgba(0,212,255,0); }
+    }
+
+    /* locate-me info popup */
+    #locate-info {
+      position: fixed; bottom: 160px; right: 14px; z-index: 1000;
+      width: 260px; background: rgba(10,16,34,.95);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; backdrop-filter: blur(14px);
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+      font-size: .72rem; color: var(--text);
+      display: none;
+    }
+    #locate-info.visible { display: block; }
+    #locate-info .loc-title { font-weight: 700; font-size: .78rem; margin-bottom: 6px; }
+    #locate-info .loc-row { display: flex; justify-content: space-between; padding: 2px 0; }
+    #locate-info .loc-label { color: var(--muted); }
+    #locate-info .loc-zones { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+    #locate-info .zone-tag {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: .65rem; font-weight: 600; margin: 2px 2px 0 0;
+    }
+
     /* data-notice banner */
     #data-notice {
       position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
@@ -446,6 +485,8 @@
     <div style="border-top:1px solid var(--border);margin:5px 0"></div>
     <div class="leg-row"><div class="leg-zone" style="background:rgba(255,59,59,.08);border-color:#ff3b3b"></div>High-Risk Zone</div>
     <div class="leg-row"><div class="leg-zone" style="background:rgba(255,140,0,.08);border-color:#ff8c00"></div>Caution Zone</div>
+    <div style="border-top:1px solid var(--border);margin:5px 0"></div>
+    <div class="leg-row"><div class="leg-sym" style="background:#00d4ff;border:2px solid #fff;border-radius:50%;width:14px;height:14px"></div>Your Location (GPS)</div>
   </div>
 </div>
 
@@ -461,6 +502,21 @@
 
 <div id="data-notice">
   ⚠ Conflict coordinates are approximate, sourced from public reports. Not for navigation.
+</div>
+
+<!-- ── LOCATE ME ────────────────────────────────────────────── -->
+<button id="locate-me-btn" onclick="locateMe()" title="Show my location on the map">
+  <i class="fas fa-location-crosshairs"></i>
+</button>
+<div id="locate-info">
+  <div class="loc-title"><i class="fas fa-location-dot"></i> Your Location</div>
+  <div class="loc-row"><span class="loc-label">Lat</span><span id="loc-lat">—</span></div>
+  <div class="loc-row"><span class="loc-label">Lng</span><span id="loc-lng">—</span></div>
+  <div class="loc-row"><span class="loc-label">Accuracy</span><span id="loc-acc">—</span></div>
+  <div class="loc-zones" id="loc-zones"></div>
+  <button onclick="clearMyLocation()" style="margin-top:8px;width:100%;padding:5px;border-radius:5px;border:1px solid var(--border);background:rgba(255,59,59,.12);color:#ff6b6b;font-size:.68rem;cursor:pointer">
+    <i class="fas fa-times"></i> Clear
+  </button>
 </div>
 
 <!-- ── TOAST ─────────────────────────────────────────────────── -->
@@ -1675,6 +1731,127 @@ function toggleLegend() {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  LOCATE ME — GPS OVERLAY
+// ══════════════════════════════════════════════════════════════
+let _myLocMarker = null, _myLocCircle = null;
+
+function locateMe() {
+  if (!navigator.geolocation) {
+    showToast('Geolocation not supported by your browser', 'warn');
+    return;
+  }
+  const btn = document.getElementById('locate-me-btn');
+  btn.classList.add('locating');
+  showToast('Acquiring GPS position…', 'info');
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      btn.classList.remove('locating');
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      sessionStorage.setItem('safezone-my-loc', JSON.stringify({ lat, lng, acc: accuracy }));
+      _showMyLocation(lat, lng, accuracy);
+      map.flyTo([lat, lng], Math.max(map.getZoom(), 7), { duration: 1.2 });
+      showToast('Location acquired', 'success');
+    },
+    err => {
+      btn.classList.remove('locating');
+      const msgs = { 1:'Location permission denied', 2:'Position unavailable', 3:'Request timed out' };
+      showToast(msgs[err.code] || 'Could not get location', 'warn');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+  );
+}
+
+function _showMyLocation(lat, lng, accuracy) {
+  // Clear previous
+  if (_myLocMarker) { map.removeLayer(_myLocMarker); _myLocMarker = null; }
+  if (_myLocCircle) { map.removeLayer(_myLocCircle); _myLocCircle = null; }
+
+  // Accuracy circle
+  _myLocCircle = L.circle([lat, lng], {
+    radius: accuracy || 50,
+    color: '#00d4ff', fillColor: '#00d4ff',
+    fillOpacity: 0.08, weight: 1, opacity: 0.4,
+  }).addTo(map);
+
+  // User marker — pulsing blue dot
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:18px;height:18px;border-radius:50%;
+      background:radial-gradient(circle,#00d4ff 40%,rgba(0,212,255,.3) 100%);
+      border:2.5px solid #fff;box-shadow:0 0 8px rgba(0,212,255,.6);
+      animation:pulse-locate 2s infinite;
+    "></div>`,
+    iconSize: [18, 18], iconAnchor: [9, 9],
+  });
+  _myLocMarker = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(map);
+
+  // Check which danger zones user is inside
+  const insideZones = DANGER_ZONES.filter(z => haversineKm(lat, lng, z.lat, z.lng) < z.r);
+  const nearZones   = DANGER_ZONES.filter(z => {
+    const d = haversineKm(lat, lng, z.lat, z.lng);
+    return d >= z.r && d < z.r * 1.3; // within 30% beyond the border
+  });
+
+  // Build popup
+  let popupHtml = `<div style="font-size:.75rem;min-width:180px">
+    <b style="color:#00d4ff"><i class="fas fa-location-dot"></i> You are here</b><br>
+    <span style="color:#aaa">${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
+
+  if (insideZones.length) {
+    popupHtml += `<div style="margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,.1)">
+      <b style="color:#ff3b3b">⚠ Inside danger zone${insideZones.length>1?'s':''}:</b><br>`;
+    insideZones.forEach(z => {
+      popupHtml += `<span style="color:${z.color}">● ${z.label}</span><br>`;
+    });
+    popupHtml += `</div>`;
+  } else if (nearZones.length) {
+    popupHtml += `<div style="margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,.1)">
+      <b style="color:#ffd700">⚡ Near danger zone${nearZones.length>1?'s':''}:</b><br>`;
+    nearZones.forEach(z => {
+      const d = haversineKm(lat, lng, z.lat, z.lng) - z.r;
+      popupHtml += `<span style="color:${z.color}">● ${z.label} (${Math.round(d)} km away)</span><br>`;
+    });
+    popupHtml += `</div>`;
+  } else {
+    popupHtml += `<div style="margin-top:6px;color:#39ff82"><b>✓ Outside all danger zones</b></div>`;
+  }
+  popupHtml += `</div>`;
+  _myLocMarker.bindPopup(popupHtml, { className:'dark-popup' }).openPopup();
+
+  // Update info panel
+  const btn = document.getElementById('locate-me-btn');
+  btn.classList.add('active');
+  document.getElementById('loc-lat').textContent = lat.toFixed(5);
+  document.getElementById('loc-lng').textContent = lng.toFixed(5);
+  document.getElementById('loc-acc').textContent = accuracy ? `±${Math.round(accuracy)} m` : '—';
+
+  const zonesDiv = document.getElementById('loc-zones');
+  if (insideZones.length) {
+    zonesDiv.innerHTML = `<div style="color:#ff3b3b;font-weight:700;font-size:.7rem;margin-bottom:3px">⚠ INSIDE DANGER ZONE${insideZones.length>1?'S':''}</div>` +
+      insideZones.map(z => `<span class="zone-tag" style="background:${z.color}22;color:${z.color};border:1px solid ${z.color}44">${z.label}</span>`).join('');
+  } else if (nearZones.length) {
+    zonesDiv.innerHTML = `<div style="color:#ffd700;font-weight:700;font-size:.7rem;margin-bottom:3px">⚡ NEAR DANGER ZONE${nearZones.length>1?'S':''}</div>` +
+      nearZones.map(z => {
+        const d = Math.round(haversineKm(lat, lng, z.lat, z.lng) - z.r);
+        return `<span class="zone-tag" style="background:${z.color}22;color:${z.color};border:1px solid ${z.color}44">${z.label} · ${d}km</span>`;
+      }).join('');
+  } else {
+    zonesDiv.innerHTML = `<div style="color:#39ff82;font-weight:700;font-size:.7rem">✓ Safe — outside all zones</div>`;
+  }
+  document.getElementById('locate-info').classList.add('visible');
+}
+
+function clearMyLocation() {
+  if (_myLocMarker) { map.removeLayer(_myLocMarker); _myLocMarker = null; }
+  if (_myLocCircle) { map.removeLayer(_myLocCircle); _myLocCircle = null; }
+  document.getElementById('locate-me-btn').classList.remove('active');
+  document.getElementById('locate-info').classList.remove('visible');
+  sessionStorage.removeItem('safezone-my-loc');
+}
+
+// ══════════════════════════════════════════════════════════════
 //  TOAST
 // ══════════════════════════════════════════════════════════════
 let toastTimer;
@@ -1708,6 +1885,14 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // Auto-dismiss data notice after 6s
+  // Re-apply locate-me marker if position was saved
+  const savedLoc = sessionStorage.getItem('safezone-my-loc');
+  if (savedLoc) {
+    try {
+      const { lat, lng, acc } = JSON.parse(savedLoc);
+      _showMyLocation(lat, lng, acc);
+    } catch(e) { /* ignore */ }
+  }
   setTimeout(()=>{
     const n = document.getElementById('data-notice');
     if(n) n.style.opacity='0', setTimeout(()=>n.remove(), 600);
