@@ -567,7 +567,7 @@
 // ══════════════════════════════════════════════════════════════
 //  VERSION — increment on every pull request
 // ══════════════════════════════════════════════════════════════
-const APP_VERSION = 'v1.1.3';
+const APP_VERSION = 'v1.1.4';
 
 // ══════════════════════════════════════════════════════════════
 //  AIRPORTS
@@ -1306,7 +1306,8 @@ async function fetchAdsbLive(callsignOrVariants, validCallsigns) {
 // Supports direct API key OR a Cloudflare Worker proxy URL.
 const AIRLABS_KEY_STORAGE = 'safezone_airlabs_key';
 const PROXY_URL_STORAGE   = 'safezone_proxy_url';
-function getAirlabsKey() { return (localStorage.getItem(AIRLABS_KEY_STORAGE) || '').trim(); }
+const DEFAULT_AIRLABS_KEY = '4a2c0441-afbb-4ec8-915c-08e81281a3cb';
+function getAirlabsKey() { return (localStorage.getItem(AIRLABS_KEY_STORAGE) || '').trim() || DEFAULT_AIRLABS_KEY; }
 function setAirlabsKey(k) { localStorage.setItem(AIRLABS_KEY_STORAGE, (k || '').trim()); }
 function getProxyUrl()    { return (localStorage.getItem(PROXY_URL_STORAGE) || '').trim().replace(/\/+$/, ''); }
 function setProxyUrl(u)   { localStorage.setItem(PROXY_URL_STORAGE, (u || '').trim().replace(/\/+$/, '')); }
