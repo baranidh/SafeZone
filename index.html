@@ -407,6 +407,27 @@
     </div>
   </div>
 
+  <!-- API Settings -->
+  <div class="panel-section">
+    <div class="panel-title" onclick="toggleSection(this)">
+      <span><i class="fas fa-key"></i> API Keys</span>
+      <i class="fas fa-chevron-down collapse-arrow"></i>
+    </div>
+    <div class="section-body" style="max-height:0">
+      <div style="padding-top:4px">
+        <label style="font-size:.68rem;font-weight:700;color:var(--text)">AirLabs API Key</label>
+        <div style="font-size:.6rem;color:var(--muted);margin:2px 0 5px">Free at <a href="https://airlabs.co/signup" target="_blank" rel="noopener" style="color:var(--accent)">airlabs.co/signup</a> · 1,000 req/mo</div>
+        <div style="display:flex;gap:4px">
+          <input id="airlabs-key-input" type="password" placeholder="Paste API key"
+            style="flex:1;min-width:0;padding:6px 8px;border-radius:5px;border:1px solid var(--border);background:rgba(0,18,44,.8);color:var(--text);font-size:.72rem;outline:none"
+          />
+          <button onclick="saveAirlabsKey()" style="padding:5px 10px;border-radius:5px;border:1px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:.68rem;cursor:pointer;white-space:nowrap">Save</button>
+        </div>
+        <div id="airlabs-key-status" style="font-size:.6rem;margin-top:3px;color:var(--muted)"></div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /#left-panel -->
 
 <!-- ── LEGEND ───────────────────────────────────────────────── -->
@@ -451,7 +472,7 @@
 // ══════════════════════════════════════════════════════════════
 //  VERSION — increment on every pull request
 // ══════════════════════════════════════════════════════════════
-const APP_VERSION = 'v1.0.4';
+const APP_VERSION = 'v1.0.5';
 
 // ══════════════════════════════════════════════════════════════
 //  AIRPORTS
@@ -1185,6 +1206,71 @@ async function fetchAdsbLive(callsignOrVariants, validCallsigns) {
   } catch(e) { console.warn('[SafeZone] ADS-B feeds failed:', e.message); return null; }
 }
 
+// ── AirLabs API (free 1000 req/mo, key required) ────────────
+// Returns ADS-B-compatible object with position + route, or null.
+const AIRLABS_KEY_STORAGE = 'safezone_airlabs_key';
+function getAirlabsKey() { return (localStorage.getItem(AIRLABS_KEY_STORAGE) || '').trim(); }
+function setAirlabsKey(k) { localStorage.setItem(AIRLABS_KEY_STORAGE, (k || '').trim()); }
+
+async function fetchAirlabs(rawCallsign, validCallsigns) {
+  const key = getAirlabsKey();
+  if (!key) return null;  // no key configured
+
+  const variants = normalizeCallsign(rawCallsign);
+  // AirLabs accepts flight_iata (e.g. SQ321) or flight_icao (e.g. SIA321)
+  for (const cs of variants) {
+    const isIcao3 = /^[A-Z]{3}\d/.test(cs);
+    const param = isIcao3 ? 'flight_icao' : 'flight_iata';
+    try {
+      const res = await fetch(
+        `https://airlabs.co/api/v9/flights?${param}=${encodeURIComponent(cs)}&api_key=${encodeURIComponent(key)}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) console.warn('[SafeZone] AirLabs: invalid API key');
+        continue;
+      }
+      const data = await res.json();
+      if (data.error) { console.warn('[SafeZone] AirLabs error:', data.error.message); continue; }
+      const flights = data.response;
+      if (!Array.isArray(flights) || !flights.length) continue;
+
+      // Find best match: must have position
+      const f = flights.find(fl => fl.lat != null && fl.lng != null);
+      if (!f) continue;
+
+      // Normalize to ADS-B-compatible object
+      console.log('[SafeZone] AirLabs hit for', cs);
+      return {
+        hex:       f.hex || null,
+        flight:    f.flight_icao || f.flight_iata || cs,
+        lat:       f.lat,
+        lon:       f.lng,
+        alt_baro:  f.alt != null ? f.alt / 0.3048 : null,  // meters → feet (ADS-B convention)
+        gs:        f.speed != null ? f.speed / 1.852 : null, // km/h → knots
+        track:     f.dir ?? null,
+        from_icao: f.dep_icao || null,
+        to_icao:   f.arr_icao || null,
+        _source:   'AirLabs',
+      };
+    } catch(e) { console.debug('[SafeZone] AirLabs failed for', cs, e.message); }
+  }
+  return null;
+}
+
+function saveAirlabsKey() {
+  const input = document.getElementById('airlabs-key-input');
+  const status = document.getElementById('airlabs-key-status');
+  const key = input.value.trim();
+  if (!key) {
+    setAirlabsKey('');
+    status.innerHTML = '<span style="color:var(--muted)">Key removed</span>';
+    return;
+  }
+  setAirlabsKey(key);
+  status.innerHTML = '<span style="color:#39ff82">✓ Key saved — will be used for next flight search</span>';
+}
+
 // Resolve ICAO airport code → { lat, lng, name, iata } — local table first
 async function resolveIcaoToCoord(icao) {
   if (!icao) return null;
@@ -1235,11 +1321,20 @@ async function trackFlightNumber() {
     if (signal.aborted) return;
     const variants = normalizeCallsign(raw);
 
-    // ── Step 1: Try ADS-B feeds FIRST (fast, ~1-2s) ───────────────
+    // ── Step 1: Try ADS-B community feeds FIRST (fast, ~1-2s) ─────
     // Pass all variants at once — fires all combinations in parallel so a fast
     // "not found" on IATA form doesn't kill the search before ICAO form responds.
-    const adsbAc = await fetchAdsbLive(variants, variants);
+    let adsbAc = await fetchAdsbLive(variants, variants);
     if (signal.aborted) return;
+
+    // ── Step 1b: Try AirLabs if community feeds missed ──────────────
+    // AirLabs uses broader data sources (1000 free req/mo, key required).
+    // Only fires when community ADS-B returned nothing, to conserve quota.
+    if (!adsbAc && getAirlabsKey()) {
+      document.getElementById('fn-status').textContent = 'Trying AirLabs…';
+      adsbAc = await fetchAirlabs(raw, variants);
+      if (signal.aborted) return;
+    }
 
     // ── Step 2: Try OpenSky only if ADS-B didn't return route info ──
     // ADS-B gives live position but often lacks origin/dest airports.
@@ -1604,6 +1699,13 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('app-version').textContent = APP_VERSION;
   document.getElementById('last-updated').textContent =
     'Updated: ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  // Initialize AirLabs key input
+  const savedKey = getAirlabsKey();
+  if (savedKey) {
+    document.getElementById('airlabs-key-input').value = savedKey;
+    document.getElementById('airlabs-key-status').innerHTML = '<span style="color:#39ff82">✓ Key saved</span>';
+  }
 
   // Auto-dismiss data notice after 6s
   setTimeout(()=>{
