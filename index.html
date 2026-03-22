@@ -130,27 +130,6 @@
     .section-body.collapsed { max-height: 0 !important; }
 
     label { font-size: .76rem; color: var(--muted); }
-    select {
-      width: 100%; padding: 7px 9px; border-radius: 7px;
-      border: 1px solid var(--border); background: rgba(0,18,44,.8);
-      color: var(--text); font-size: .8rem; outline: none; transition: border-color .2s;
-      -webkit-appearance: none; appearance: none;
-    }
-    select:focus { border-color: var(--accent); }
-    select option { background: #0b1a2e; }
-
-    .btn-primary {
-      width: 100%; padding: 8px; border-radius: 7px; border: 1px solid var(--accent);
-      background: rgba(0,212,255,.12); color: var(--accent);
-      font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .2s;
-    }
-    .btn-primary:hover { background: rgba(0,212,255,.25); }
-    .btn-secondary {
-      width: 100%; padding: 7px; border-radius: 7px; border: 1px solid var(--accent2);
-      background: rgba(255,107,53,.1); color: var(--accent2);
-      font-size: .78rem; font-weight: 600; cursor: pointer; transition: all .2s;
-    }
-    .btn-secondary:hover { background: rgba(255,107,53,.22); }
 
     .filter-row { display: flex; align-items: center; gap: 7px; font-size: .78rem; cursor: pointer; padding: 2px 0; }
     .filter-row input[type=checkbox] { width: auto; accent-color: var(--accent); cursor: pointer; }
@@ -161,23 +140,6 @@
     .stat-card .sv { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
     .stat-card .sl { font-size: .66rem; color: var(--muted); margin-top: 1px; }
 
-    #flights-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
-    .flight-item {
-      background: rgba(0,18,44,.7); border: 1px solid var(--border);
-      border-radius: 7px; padding: 6px 9px; font-size: .73rem;
-      cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 7px;
-    }
-    .flight-item:hover { border-color: var(--accent); background: rgba(0,212,255,.07); }
-    .flight-item i { color: var(--accent); font-size: .78rem; flex-shrink: 0; }
-    .flight-item .callsign { font-weight: 700; color: var(--accent); }
-    .flight-item .details { color: var(--muted); font-size: .66rem; margin-top: 1px; }
-    .flights-placeholder { color: var(--muted); font-size: .76rem; padding: 6px 2px; line-height: 1.5; }
-
-    #flight-path-info {
-      background: rgba(0,18,44,.9); border: 1px solid rgba(0,212,255,.28);
-      border-radius: 8px; padding: 10px; font-size: .76rem; display: none;
-    }
-    #flight-path-info .route { font-weight: 700; color: var(--accent); font-size: .88rem; }
     .risk-high { color: var(--red); font-weight: 600; }
     .risk-med  { color: var(--orange); font-weight: 600; }
     .risk-low  { color: var(--green); font-weight: 600; }
@@ -388,44 +350,9 @@
     <div class="section-body" style="max-height:200px">
       <div class="stats-grid" style="padding-top:4px">
         <div class="stat-card"><div class="sv" id="stat-events">—</div><div class="sl">Strike Events</div></div>
-        <div class="stat-card"><div class="sv" id="stat-flights">—</div><div class="sl">Corridor Aircraft</div></div>
         <div class="stat-card"><div class="sv">8</div><div class="sl">Danger Zones</div></div>
         <div class="stat-card"><div class="sv">6</div><div class="sl">Active Actors</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Flight Path Planner (ALTERNATE) -->
-  <div class="panel-section">
-    <div class="panel-title" onclick="toggleSection(this)">
-      <span><i class="fas fa-route"></i> Route Planner <span style="font-size:.6rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">&nbsp;alternate</span></span>
-      <i class="fas fa-chevron-down collapse-arrow"></i>
-    </div>
-    <div class="section-body" style="max-height:400px">
-      <div style="display:flex;flex-direction:column;gap:7px;padding-top:4px">
-        <label>Origin Airport</label>
-        <select id="origin-select"></select>
-        <label>Destination Airport</label>
-        <select id="dest-select"></select>
-        <button class="btn-primary" onclick="plotFlightPath()"><i class="fas fa-paper-plane"></i> Show Path + Live Flights</button>
-        <button class="btn-secondary" onclick="clearFlightPath()"><i class="fas fa-times"></i> Clear</button>
-        <div id="flight-path-info"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live Flights on Route -->
-  <div class="panel-section">
-    <div class="panel-title" onclick="toggleSection(this)">
-      <span><i class="fas fa-plane"></i> Live Flights on Route</span>
-      <i class="fas fa-chevron-down collapse-arrow"></i>
-    </div>
-    <div class="section-body" style="max-height:240px">
-      <div id="flights-list" style="padding-top:4px">
-        <div class="flights-placeholder">
-          <i class="fas fa-info-circle" style="color:var(--accent)"></i>
-          Select origin &amp; destination airports then press <strong style="color:var(--accent)">Show Path + Live Flights</strong> to see aircraft currently on that route.
-        </div>
+        <div class="stat-card"><div class="sv" id="stat-flights">—</div><div class="sl">Tracked Flight</div></div>
       </div>
     </div>
   </div>
@@ -471,9 +398,9 @@
     <div class="leg-row"><div class="leg-sym" style="background:#ff8c00">⬆</div>Missile/Rocket</div>
     <div class="leg-row"><div class="leg-sym" style="background:#ffd700">◆</div>Drone Attack</div>
     <div style="border-top:1px solid var(--border);margin:5px 0"></div>
-    <div class="leg-row"><div class="leg-line" style="background:#00d4ff"></div>Flight Path</div>
+    <div class="leg-row"><div class="leg-line" style="background:#00d4ff"></div>Tracked Flight Route</div>
     <div class="leg-row"><div class="leg-line" style="background:#ff3b3b"></div>High-Risk Route</div>
-    <div class="leg-row"><div class="leg-sym" style="background:rgba(0,212,255,.4);border:1px solid #00d4ff">✈</div>Route Flight</div>
+    <div class="leg-row"><div class="leg-sym" style="background:rgba(255,255,255,.4);border:1px solid #fff">✈</div>Live Aircraft</div>
     <div style="border-top:1px solid var(--border);margin:5px 0"></div>
     <div class="leg-row"><div class="leg-zone" style="background:rgba(255,59,59,.08);border-color:#ff3b3b"></div>High-Risk Zone</div>
     <div class="leg-row"><div class="leg-zone" style="background:rgba(255,140,0,.08);border-color:#ff8c00"></div>Caution Zone</div>
@@ -640,9 +567,16 @@ const DANGER_ZONES = [
 // ══════════════════════════════════════════════════════════════
 //  MAP INIT
 // ══════════════════════════════════════════════════════════════
-let map, conflictGroup, dangerGroup, flightPathGroup, routeFlightsGroup, flightSearchGroup;
-let allMarkers = [];
+// HTML-escape untrusted strings before inserting into innerHTML
+function esc(s) {
+  const el = document.createElement('span');
+  el.textContent = s;
+  return el.innerHTML;
+}
+
+let map, conflictGroup, dangerGroup, flightSearchGroup;
 let _activeFlightSearch = null; // { callsign, icao24, lat, lng } for refresh
+let _trackAbort = null; // AbortController for in-flight trackFlightNumber call
 
 function initMap() {
   map = L.map('map', { center:[29, 42], zoom:5, zoomControl:false });
@@ -653,13 +587,10 @@ function initMap() {
 
   dangerGroup       = L.layerGroup().addTo(map);
   conflictGroup     = L.layerGroup().addTo(map);
-  flightPathGroup   = L.layerGroup().addTo(map);
-  routeFlightsGroup = L.layerGroup().addTo(map);
   flightSearchGroup = L.layerGroup().addTo(map);
 
   renderDangerZones();
   renderConflictEvents(CONFLICT_EVENTS);
-  populateAirportSelects();
   document.getElementById('stat-events').textContent = CONFLICT_EVENTS.length;
 }
 
@@ -698,21 +629,19 @@ function makeIcon(ev) {
 
 function renderConflictEvents(events) {
   conflictGroup.clearLayers();
-  allMarkers = [];
   events.forEach(ev => {
     const m = L.marker([ev.lat, ev.lng], { icon: makeIcon(ev) });
     const badge = `badge-${ev.severity}`;
     const ac = ACTOR_COLOR[ev.actor] || '#fff';
     m.bindPopup(`
       <div style="min-width:220px;max-width:280px">
-        <div class="popup-badge ${badge}">${ev.severity.toUpperCase()}</div>
-        <div class="popup-title">${ev.target}</div>
-        <div class="popup-meta">📅 ${ev.date} &nbsp;·&nbsp; <span style="color:${ac}">${ev.actor}</span> &nbsp;·&nbsp; ${ev.type}</div>
-        <div class="popup-desc">${ev.desc}</div>
-        <div class="popup-source">📡 ${ev.source}</div>
+        <div class="popup-badge ${badge}">${esc(ev.severity.toUpperCase())}</div>
+        <div class="popup-title">${esc(ev.target)}</div>
+        <div class="popup-meta">📅 ${esc(ev.date)} &nbsp;·&nbsp; <span style="color:${ac}">${esc(ev.actor)}</span> &nbsp;·&nbsp; ${esc(ev.type)}</div>
+        <div class="popup-desc">${esc(ev.desc)}</div>
+        <div class="popup-source">📡 ${esc(ev.source)}</div>
       </div>`, { maxWidth:300 });
     conflictGroup.addLayer(m);
-    allMarkers.push({ marker:m, event:ev });
   });
 }
 
@@ -745,33 +674,6 @@ function applyFilters() {
 
 function toggleDangerZones() {
   document.getElementById('f-zones').checked ? dangerGroup.addTo(map) : map.removeLayer(dangerGroup);
-}
-
-// ══════════════════════════════════════════════════════════════
-//  AIRPORT SELECTS
-// ══════════════════════════════════════════════════════════════
-function populateAirportSelects() {
-  const codes = Object.keys(AIRPORTS).sort((a,b) => AIRPORTS[a].country.localeCompare(AIRPORTS[b].country));
-  ['origin-select','dest-select'].forEach(id => {
-    const sel = document.getElementById(id);
-    // Group by country
-    const byCountry = {};
-    codes.forEach(c => { const co = AIRPORTS[c].country; (byCountry[co] = byCountry[co]||[]).push(c); });
-    sel.innerHTML = '';
-    Object.keys(byCountry).sort().forEach(country => {
-      const grp = document.createElement('optgroup');
-      grp.label = country;
-      byCountry[country].forEach(code => {
-        const opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = `${code} – ${AIRPORTS[code].name}`;
-        grp.appendChild(opt);
-      });
-      sel.appendChild(grp);
-    });
-  });
-  document.getElementById('origin-select').value = 'SIN';
-  document.getElementById('dest-select').value   = 'LHR';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -835,39 +737,8 @@ function greatCircle(lat1,lon1,lat2,lon2,n=120) {
 
 function haversineKm(lat1,lon1,lat2,lon2) {
   const R=6371,dL=(lat2-lat1)*Math.PI/180,dl=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dl/2)**2;
+  const a=Math.max(0,Math.min(1,Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dl/2)**2));
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-function distToPath(lat,lng,pts) {
-  // Return the minimum distance (km) from a point to any sampled path point
-  let min = Infinity;
-  for(let i=0;i<pts.length;i+=4){
-    const d = haversineKm(lat,lng,pts[i][0],pts[i][1]);
-    if(d < min) min = d;
-  }
-  return min;
-}
-
-function isNearPath(lat,lng,pts,threshKm=50) {
-  return distToPath(lat,lng,pts) < threshKm;
-}
-
-// Bearing from first to last waypoint — used to verify aircraft heading
-function routeBearing(pts) {
-  const [lat1, lon1] = pts[0];
-  const [lat2, lon2] = pts[pts.length - 1];
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-  const y = Math.sin(dLon) * Math.cos(φ2);
-  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-// Smallest angle between two compass headings
-function angleDiff(a, b) {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
 }
 
 function pathCrossesZones(pts) {
@@ -880,255 +751,6 @@ function pathCrossesZones(pts) {
   return hit;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  PLOT FLIGHT PATH + FETCH ROUTE FLIGHTS
-// ══════════════════════════════════════════════════════════════
-async function plotFlightPath() {
-  const oCode = document.getElementById('origin-select').value;
-  const dCode = document.getElementById('dest-select').value;
-  if(oCode===dCode){ showToast('Select different airports','error'); return; }
-  const O=AIRPORTS[oCode], D=AIRPORTS[dCode];
-
-  clearFlightPath();
-
-  // Try real IFR airways route first; fall back to great circle
-  showToast(`Looking up real airway route ${oCode}→${dCode}…`, 'info');
-  let pts = null;
-  let routeIsReal = false;
-
-  if (O.icao && D.icao) {
-    pts = await fetchRealRoute(O.icao, D.icao);
-    if (pts && pts.length >= 2) {
-      routeIsReal = true;
-    }
-  }
-
-  if (!pts || pts.length < 2) {
-    pts = greatCircle(O.lat, O.lng, D.lat, D.lng);
-    routeIsReal = false;
-  }
-
-  const zones = pathCrossesZones(pts);
-  const highRisk = zones.some(z=>z.level==='high');
-  const pathColor = highRisk ? '#ff3b3b' : zones.length ? '#ff8c00' : '#00d4ff';
-
-  // Draw path
-  const line = L.polyline(pts,{ color:pathColor, weight:3.5, opacity:.9, dashArray: zones.length ? null : '10 5' });
-  flightPathGroup.addLayer(line);
-
-  // Airport labels
-  const airportIcon = (code,color='#00d4ff') => L.divIcon({
-    html:`<div style="background:${color};color:#000;font-size:.62rem;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 0 8px ${color}88">${code}</div>`,
-    className:'', iconAnchor:[18,8],
-  });
-  flightPathGroup.addLayer(L.marker([O.lat,O.lng],{icon:airportIcon(oCode,pathColor)}));
-  flightPathGroup.addLayer(L.marker([D.lat,D.lng],{icon:airportIcon(dCode,pathColor)}));
-
-  map.fitBounds(line.getBounds(),{padding:[60,60]});
-
-  const distKm = Math.round(haversineKm(O.lat,O.lng,D.lat,D.lng));
-
-  // Risk info panel
-  const infoEl = document.getElementById('flight-path-info');
-  infoEl.style.display = 'block';
-  let riskHtml = zones.length===0
-    ? `<div class="risk-low">✓ Clear of known active conflict zones</div>`
-    : `<div class="${highRisk?'risk-high':'risk-med'}">${highRisk?'⚠ HIGH RISK':'⚡ CAUTION'}: route crosses conflict zones</div>`;
-  zones.forEach(z=>{ riskHtml+=`<div class="risk-item"><span style="color:${z.color}">●</span>${z.label}</div>`; });
-
-  const routeBadge = routeIsReal
-    ? `<div style="font-size:.68rem;color:#4caf50;margin-top:4px">✔ Real IFR airways route (flightplandatabase.com)</div>`
-    : `<div style="font-size:.68rem;color:var(--muted);margin-top:4px">~ Estimated great-circle path (real route unavailable)</div>`;
-
-  infoEl.innerHTML = `
-    <div class="route">${oCode} → ${dCode}</div>
-    <div style="font-size:.7rem;color:var(--muted);margin-top:2px">${O.name} → ${D.name}</div>
-    <div style="font-size:.76rem;margin-top:5px">📏 ${distKm.toLocaleString()} km &nbsp;(${Math.round(distKm*.621).toLocaleString()} mi)</div>
-    ${routeBadge}
-    <div style="margin-top:7px">${riskHtml}</div>`;
-
-  showToast(`Fetching live aircraft on ${oCode}→${dCode} corridor…`,'info');
-  await fetchRouteFlights(pts, oCode, dCode, distKm);
-}
-
-async function fetchRouteFlights(pts, oCode, dCode, distKm) {
-  const O = AIRPORTS[oCode], D = AIRPORTS[dCode];
-
-  routeFlightsGroup.clearLayers();
-  document.getElementById('flights-list').innerHTML =
-    `<div class="flights-placeholder">⏳ Step 1/2 — checking departures from ${oCode}…</div>`;
-  document.getElementById('stat-flights').textContent = '…';
-
-  // ── Step 1: ask OpenSky which aircraft actually departed from origin ──────
-  // Window = estimated flight time (dist ÷ 870 km/h) + 30 min buffer for taxi/climb
-  const flightHours = distKm / 870 * 1.15 + 0.5;
-  const now   = Math.floor(Date.now() / 1000);
-  const begin = now - Math.round(flightHours * 3600);
-
-  let directIcao24s = null; // Set<string> when we have confirmed departures
-  let depApiWorked  = false; // true once the departure API returns a valid response
-
-  try {
-    const depRes = await fetch(
-      `https://opensky-network.org/api/flights/departure?airport=${O.icao}&begin=${begin}&end=${now}`,
-      { signal: AbortSignal.timeout(12000) }
-    );
-    if (depRes.ok) {
-      const departures = await depRes.json();
-      depApiWorked = true;
-      if (Array.isArray(departures) && departures.length > 0) {
-        // Only keep flights confirmed to land at our destination.
-        // We intentionally exclude "estArrivalAirport == null" — an unknown
-        // destination is not evidence the flight is going to D.icao, and
-        // including them produced false positives near busy hubs.
-        const relevant = departures.filter(f =>
-          f.icao24 && f.estArrivalAirport === D.icao
-        );
-        if (relevant.length > 0) {
-          directIcao24s = new Set(relevant.map(f => f.icao24.toLowerCase()));
-        }
-      }
-    }
-  } catch(e) {
-    console.warn('[SafeZone] Departure lookup failed:', e.message);
-    // depApiWorked stays false
-  }
-
-  // ── Guard: if we have no confirmed departures, stop here ─────────────────
-  // The positional-only fallback (bounding box + heading filter) is unreliable
-  // for long-haul routes: many unrelated aircraft converge near the destination
-  // and pass the heading + altitude gates.  Better to show nothing than to show
-  // wrong flights.
-  if (!directIcao24s) {
-    const msg = depApiWorked
-      ? `No ${oCode}→${dCode} departures found in the past ${Math.round(flightHours)}h. `
-        + `The flight may not have departed yet, or check back once it's airborne.`
-      : `Departure records temporarily unavailable (OpenSky rate limit). `
-        + `Tap Refresh in a few seconds to try again.`;
-    document.getElementById('flights-list').innerHTML =
-      `<div class="flights-placeholder" style="color:var(--muted)">${msg}</div>`;
-    document.getElementById('stat-flights').textContent = '0';
-    showToast(depApiWorked ? `No verified ${oCode}→${dCode} flights yet` : 'Departure data rate-limited — retry shortly', 'info');
-    return;
-  }
-
-  // ── Step 2: fetch live positions in the route bounding box ───────────────
-  document.getElementById('flights-list').innerHTML =
-    `<div class="flights-placeholder">⏳ Step 2/2 — fetching live positions…</div>`;
-
-  const lats = pts.map(p=>p[0]), lngs = pts.map(p=>p[1]);
-  const lamin = (Math.min(...lats)-2).toFixed(2);
-  const lamax = (Math.max(...lats)+2).toFixed(2);
-  const lomin = (Math.min(...lngs)-2).toFixed(2);
-  const lomax = (Math.max(...lngs)+2).toFixed(2);
-
-  // Positional safety gates — applied on top of the icao24 whitelist to
-  // discard any stale departure record that has since landed or diverted.
-  const isLongHaul = distKm > 1500;
-  const minAltM    = isLongHaul ? 8500 : 3500;
-  const minSpeedMs = isLongHaul ? 185  : 100;
-  const headingTol = 65;
-  const bearing    = routeBearing(pts);
-
-  try {
-    const statesRes = await fetch(
-      `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`,
-      { signal: AbortSignal.timeout(14000) }
-    );
-    if (!statesRes.ok) throw new Error(`HTTP ${statesRes.status}`);
-    const data = await statesRes.json();
-
-    // Apply positional gates, then restrict to confirmed icao24s only.
-    let states = (data.states || []).filter(s => {
-      if (!s || s[8]) return false;
-      if (s[5] == null || s[6] == null) return false;
-      if (s[7] == null || s[7] < minAltM) return false;
-      if (s[9] == null || s[9] < minSpeedMs) return false;
-      if (s[10] != null && angleDiff(s[10], bearing) > headingTol) return false;
-      return directIcao24s.has(s[0].toLowerCase());
-    });
-
-    // Final proximity check: must be within 50 km of the actual drawn path
-    const scored = states
-      .map(s => ({ s, dist: distToPath(s[6], s[5], pts) }))
-      .filter(x => x.dist < 50)
-      .sort((a, b) => a.dist - b.dist);
-
-    renderRouteFlights(scored.map(x => x.s), oCode, dCode, true);
-  } catch(e) {
-    const errMsg = e.name === 'TimeoutError'
-      ? 'OpenSky request timed out. Try again.'
-      : `Live flight data unavailable (${e.message})`;
-    document.getElementById('flights-list').innerHTML =
-      `<div class="flights-placeholder" style="color:var(--orange)">⚠ ${errMsg}</div>`;
-    document.getElementById('stat-flights').textContent = '—';
-    showToast('Could not fetch live flights', 'error');
-  }
-}
-
-function renderRouteFlights(flights, oCode, dCode, verifiedDirect) {
-  routeFlightsGroup.clearLayers();
-  document.getElementById('stat-flights').textContent = flights.length;
-
-  const planeIcon = (track) => L.divIcon({
-    html:`<div style="transform:rotate(${track||0}deg);font-size:13px;line-height:1;color:#00d4ff;opacity:.92">✈</div>`,
-    className:'', iconSize:[14,14], iconAnchor:[7,7],
-  });
-
-  flights.slice(0,25).forEach(s => {
-    const cs  = (s[1]||'').trim()||'N/A';
-    const alt = s[7]  ? `${Math.round(s[7]/100)/10} km` : '—';
-    const vel = s[9]  ? `${Math.round(s[9]*3.6)} km/h` : '—';
-    const trk = s[10] || 0;
-    const m   = L.marker([s[6],s[5]], { icon: planeIcon(trk) });
-    m.bindPopup(`
-      <div class="flight-popup-title">✈ ${cs}</div>
-      <div class="flight-popup-body" style="font-size:.76rem;color:var(--muted);margin-top:4px">
-        <div>Country: <span style="color:var(--text)">${s[2]||'—'}</span></div>
-        <div>Altitude: <span style="color:var(--text)">${alt}</span></div>
-        <div>Speed: <span style="color:var(--text)">${vel}</span></div>
-        <div>Heading: <span style="color:var(--text)">${Math.round(trk)}°</span></div>
-        <div>ICAO24: <span style="color:var(--muted)">${s[0]}</span></div>
-        ${verifiedDirect ? `<div style="color:#4caf50;margin-top:3px">✔ Confirmed departed ${oCode}</div>` : ''}
-      </div>`);
-    routeFlightsGroup.addLayer(m);
-  });
-
-  const listEl = document.getElementById('flights-list');
-  if(flights.length===0){
-    const reason = verifiedDirect
-      ? `No aircraft confirmed departed ${oCode} and currently airborne toward ${dCode}.`
-      : `No airliners at cruise altitude detected in the ${oCode}→${dCode} corridor right now.`;
-    listEl.innerHTML = `<div class="flights-placeholder">${reason}</div>`;
-    showToast(`No direct flights found on ${oCode}→${dCode}`,'info');
-    return;
-  }
-
-  const sourceLabel = verifiedDirect
-    ? `✔ Confirmed direct departures from ${oCode} · live ADS-B positions`
-    : `~ Approximate — departure data unavailable · cruise-altitude filter applied`;
-  const sourceColor = verifiedDirect ? '#4caf50' : 'var(--muted)';
-
-  const note = `<div style="font-size:.65rem;color:${sourceColor};padding:3px 2px 5px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:4px">
-    ${sourceLabel}
-  </div>`;
-
-  listEl.innerHTML = note + flights.slice(0,15).map(s => {
-    const cs  = (s[1]||'').trim()||'N/A';
-    const alt = s[7] ? `${Math.round(s[7]/100)/10} km` : '—';
-    const vel = s[9] ? `${Math.round(s[9]*3.6)} km/h` : '—';
-    return `<div class="flight-item" onclick="map.flyTo([${s[6]},${s[5]}],9)">
-      <i class="fas fa-plane"></i>
-      <div>
-        <div class="callsign">${cs} &nbsp;<span style="font-weight:400;color:var(--muted)">${s[2]||''}</span></div>
-        <div class="details">${alt} · ${vel}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const label = verifiedDirect ? 'direct flight' : 'aircraft';
-  showToast(`${flights.length} ${label}${flights.length!==1?'s':''} on ${oCode}→${dCode}`,'success');
-}
 
 // ══════════════════════════════════════════════════════════════
 //  TRACK BY FLIGHT NUMBER
@@ -1168,15 +790,15 @@ const AIRLINE_NAMES = {
 function normalizeCallsign(raw) {
   // Returns array of callsigns to try (IATA version first, then ICAO equivalent)
   const cs = raw.replace(/\s+|-/g, '').toUpperCase().trim();
+  if (!cs) return [];
+  // 2-letter IATA prefix → also try the 3-letter ICAO transponder callsign
   const m = cs.match(/^([A-Z][A-Z0-9])(\d+[A-Z]?)$/);
   if (m) {
     const prefix = m[1], num = m[2];
     const icaoPrefix = IATA_TO_ICAO_AIRLINE[prefix];
     return icaoPrefix ? [cs, icaoPrefix + num] : [cs];
   }
-  // Could be a 3-letter ICAO callsign prefix already
-  const m3 = cs.match(/^([A-Z]{3})(\d+[A-Z]?)$/);
-  if (m3) return [cs];
+  // 3-letter ICAO prefix or anything else — try as-is
   return [cs];
 }
 
@@ -1214,7 +836,7 @@ async function fetchFlightRecord(rawCallsign) {
       return await Promise.any(
         variants.map(cs => _tryWindow(cs, now - offset - W, now - offset))
       );
-    } catch { /* no hit in this window, try the next */ }
+    } catch(e) { console.debug('[SafeZone] No hit in window offset', offset, e.message || e); }
   }
 
   // Phase 2: one spot-check per day for days 1–10 (captures the standard route on days
@@ -1225,7 +847,7 @@ async function fetchFlightRecord(rawCallsign) {
       return await Promise.any(
         variants.map(cs => _tryWindow(cs, end - W, end))
       );
-    } catch { /* not found on this day */ }
+    } catch(e) { console.debug('[SafeZone] No hit on day', day, e.message || e); }
   }
 
   return null;
@@ -1241,7 +863,7 @@ async function fetchLiveState(icao24) {
     if (!res.ok) return null;
     const data = await res.json();
     return data.states?.[0] || null;
-  } catch { return null; }
+  } catch(e) { console.warn('[SafeZone] fetchLiveState failed:', e.message); return null; }
 }
 
 // Generic helper: fetch from any ADS-B Exchange-compatible API (adsb.lol, airplanes.live…)
@@ -1263,7 +885,7 @@ async function fetchAdsbLive(callsign) {
       _fetchAdsbApi(`https://api.adsb.lol/v2/callsign/${cs}`,      'adsb.lol'),
       _fetchAdsbApi(`https://api.airplanes.live/v2/callsign/${cs}`, 'airplanes.live'),
     ]);
-  } catch { return null; }
+  } catch(e) { console.warn('[SafeZone] All ADS-B feeds failed:', e.message); return null; }
 }
 
 // Resolve ICAO airport code → { lat, lng, name, iata } — local table first
@@ -1283,7 +905,7 @@ async function resolveIcaoToCoord(icao) {
     const d = await res.json();
     if (d.lat == null || d.lon == null) return null;
     return { lat: d.lat, lng: d.lon, name: d.name || up, iata: d.IATA || up };
-  } catch { return null; }
+  } catch(e) { console.warn('[SafeZone] Airport resolve failed for', up, e.message); return null; }
 }
 
 let _fnMarker = null; // reference to the live aircraft marker for centering
@@ -1296,6 +918,11 @@ async function trackFlightNumber() {
   const raw = document.getElementById('fn-input').value.trim();
   if (!raw) { showToast('Enter a flight number', 'error'); return; }
 
+  // Cancel any in-flight search to prevent race conditions
+  if (_trackAbort) _trackAbort.abort();
+  _trackAbort = new AbortController();
+  const signal = _trackAbort.signal;
+
   const btn = document.getElementById('fn-track-btn');
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -1307,6 +934,8 @@ async function trackFlightNumber() {
   _fnMarker = null;
 
   try {
+    // Bail early if already superseded by a newer search
+    if (signal.aborted) return;
     // ── Fire OpenSky (route/history) + adsb.lol (live position) in parallel ──
     // adsb.lol has broader coverage incl. oceanic routes; OpenSky is used for
     // origin/dest which adsb.lol may not always carry.
@@ -1316,6 +945,7 @@ async function trackFlightNumber() {
       fetchFlightRecord(raw),
       Promise.any(variants.map(cs => fetchAdsbLive(cs))).catch(() => null),
     ]);
+    if (signal.aborted) return;
 
     if (!record && !adsbAc) {
       document.getElementById('fn-status').textContent =
@@ -1358,6 +988,8 @@ async function trackFlightNumber() {
       state = await fetchLiveState(icao24);
     }
 
+    if (signal.aborted) return;
+
     const isAirborne = !!(state && state[6] != null && state[5] != null);
     const lat     = isAirborne ? state[6]         : null;
     const lng     = isAirborne ? state[5]         : null;
@@ -1390,7 +1022,7 @@ async function trackFlightNumber() {
       flightSearchGroup.addLayer(line);
 
       const apIcon = (label, color) => L.divIcon({
-        html:`<div style="background:${color};color:#000;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap;opacity:.85">${label}</div>`,
+        html:`<div style="background:${color};color:#000;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap;opacity:.85">${esc(label)}</div>`,
         className:'', iconAnchor:[18,8],
       });
       flightSearchGroup.addLayer(L.marker([oCoord.lat, oCoord.lng], { icon: apIcon(oCoord.iata, pathColor) }));
@@ -1410,13 +1042,13 @@ async function trackFlightNumber() {
       });
       _fnMarker = L.marker([lat, lng], { icon: acIcon, zIndexOffset: 1000 });
       _fnMarker.bindPopup(`
-        <div style="font-size:.9rem;font-weight:800;color:var(--accent)">✈ ${csFound}</div>
+        <div style="font-size:.9rem;font-weight:800;color:var(--accent)">✈ ${esc(csFound)}</div>
         <div style="font-size:.76rem;color:var(--muted);margin-top:5px">
-          <div style="color:var(--text);font-weight:600;margin-bottom:3px">${oName} → ${dName}</div>
-          <div>Altitude: <span style="color:var(--text)">${altKm}</span></div>
-          <div>Speed: <span style="color:var(--text)">${velKmh}</span></div>
+          <div style="color:var(--text);font-weight:600;margin-bottom:3px">${esc(oName)} → ${esc(dName)}</div>
+          <div>Altitude: <span style="color:var(--text)">${esc(altKm)}</span></div>
+          <div>Speed: <span style="color:var(--text)">${esc(velKmh)}</span></div>
           <div>Heading: <span style="color:var(--text)">${Math.round(track)}°</span></div>
-          <div style="color:var(--muted);margin-top:3px">ICAO24: ${icao24} · via ${dataSource}</div>
+          <div style="color:var(--muted);margin-top:3px">ICAO24: ${esc(icao24 || '')} · via ${esc(dataSource)}</div>
           ${routeIsReal ? `<div style="color:#4caf50;margin-top:3px">✔ Real IFR airways route</div>` : ''}
         </div>`);
       flightSearchGroup.addLayer(_fnMarker);
@@ -1440,8 +1072,8 @@ async function trackFlightNumber() {
         ? `  ·  via ${dataSource}`
         : (lastSeenDate ? `  ·  last seen ${lastSeenDate}` : '  ·  not currently airborne'));
 
-    const oLabel = oCoord ? `<span class="fn-ap">${oCoord.iata}</span>` : (oIcao ? `<span class="fn-ap">${oIcao}</span>` : '');
-    const dLabel = dCoord ? `<span class="fn-ap">${dCoord.iata}</span>` : (dIcao ? `<span class="fn-ap">${dIcao}</span>` : '<span style="color:var(--muted)">destination unknown</span>');
+    const oLabel = oCoord ? `<span class="fn-ap">${esc(oCoord.iata)}</span>` : (oIcao ? `<span class="fn-ap">${esc(oIcao)}</span>` : '');
+    const dLabel = dCoord ? `<span class="fn-ap">${esc(dCoord.iata)}</span>` : (dIcao ? `<span class="fn-ap">${esc(dIcao)}</span>` : '<span style="color:var(--muted)">destination unknown</span>');
     document.getElementById('fn-route-line').innerHTML =
       oLabel + (oLabel ? ` <i class="fas fa-arrow-right" style="color:var(--muted);font-size:.65rem"></i> ` : '') + dLabel +
       (distKm ? `<span style="color:var(--muted);font-size:.68rem">&nbsp;${distKm.toLocaleString()} km</span>` : '');
@@ -1457,8 +1089,8 @@ async function trackFlightNumber() {
     }
 
     const statusTag = isAirborne
-      ? `<span class="fn-tag fn-tag-ok">● Airborne · ${dataSource}</span>`
-      : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + lastSeenDate : ''}</span>`;
+      ? `<span class="fn-tag fn-tag-ok">● Airborne · ${esc(dataSource)}</span>`
+      : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
     const routeTag = pts
       ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : '~ Great circle'}</span>`
       : '';
@@ -1482,11 +1114,15 @@ async function trackFlightNumber() {
     );
 
   } catch(e) {
+    if (signal.aborted) return; // superseded by newer search, don't touch UI
+    console.error('[SafeZone] trackFlightNumber error:', e);
     document.getElementById('fn-status').textContent = `⚠ Error: ${e.message}`;
     showToast('Flight lookup failed', 'error');
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Track';
+    if (!signal.aborted) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Track';
+    }
   }
 }
 
@@ -1498,14 +1134,6 @@ function clearFlightSearch() {
   document.getElementById('fn-status').textContent = '';
   document.getElementById('fn-input').value = '';
   document.getElementById('stat-flights').textContent = '—';
-}
-
-function clearFlightPath() {
-  flightPathGroup.clearLayers();
-  routeFlightsGroup.clearLayers();
-  document.getElementById('flight-path-info').style.display = 'none';
-  document.getElementById('flights-list').innerHTML = `<div class="flights-placeholder"><i class="fas fa-info-circle" style="color:var(--accent)"></i> Select origin &amp; destination airports then press <strong style="color:var(--accent)">Show Path + Live Flights</strong>.</div>`;
-  if (!_activeFlightSearch) document.getElementById('stat-flights').textContent = '—';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1523,17 +1151,7 @@ async function refreshAll() {
     showToast(`Refreshing ${_activeFlightSearch.callsign}…`, 'info');
     await trackFlightNumber();
   } else {
-    // If a route path is currently shown, re-fetch its live flights
-    const hasPath = flightPathGroup.getLayers().length > 0;
-    if (hasPath) {
-      showToast('Refreshing route flights…', 'info');
-      const pts = flightPathGroup.getLayers()[0]?.getLatLngs?.()?.map(l => [l.lat, l.lng]);
-      const oCode = document.getElementById('origin-select').value;
-      const dCode = document.getElementById('dest-select').value;
-      if (pts && pts.length) await fetchRouteFlights(pts, oCode, dCode);
-    } else {
-      showToast('Conflict data refreshed', 'success');
-    }
+    showToast('Conflict data refreshed', 'success');
   }
 
   document.getElementById('last-updated').textContent =
