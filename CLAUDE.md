@@ -16,12 +16,12 @@ SafeZone is a single-page web application that monitors Middle East conflict eve
 
 - **Conflict Map**: 45+ strike events (2024–2026) with actor/severity/type filtering and interactive markers.
 - **8 Danger Zones**: Circular regions (Gaza, Lebanon, Beirut, Yemen, Red Sea, Israel, Syria, Iran) rendered as Leaflet circles with risk levels.
-- **Flight Tracking**: Multi-source live tracking with 5-layer fallback:
-  1. ADS-B (adsb.lol, airplanes.live) — real-time position
-  2. AirLabs API — alternative live tracking (direct API key or via Cloudflare Worker proxy)
-  3. OpenSky Network — historical flight records
-  4. Flight Plan Database — real IFR airway routes
-  5. Known Routes cache — 170+ pre-loaded airline routes (localStorage fallback)
+- **Flight Tracking**: Multi-source live tracking with 5-layer fallback (free sources first, paid last):
+  1. ADS-B (adsb.lol, airplanes.live) — free real-time position
+  2. OpenSky Network — free historical flight records
+  3. Flight Plan Database — free real IFR airway routes
+  4. AirLabs API — paid fallback via direct key or Cloudflare Worker proxy (only called after all free sources fail)
+  5. Known Routes cache — 170+ pre-loaded airline routes (localStorage offline fallback)
 - **Cloudflare Worker Proxy**: Optional CORS proxy (`cloudflare-worker-proxy.js`) for AirLabs API that keeps the API key secret server-side. Includes rate limiting (60 req/min/IP), health check endpoint, and input validation. The frontend verifies proxy connectivity on save and shows user-visible error toasts for proxy failures (401/403/429/502).
 - **Danger Zone Crossing Detection**: Automatically checks if a tracked flight's route passes through any danger zone using haversine distance.
 - **GPS Locate Me**: Browser geolocation button that shows the user's real-time position overlaid on the map, with warnings if inside or near danger zones.

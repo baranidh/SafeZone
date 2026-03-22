@@ -581,7 +581,7 @@
 // ══════════════════════════════════════════════════════════════
 //  VERSION — increment on every pull request
 // ══════════════════════════════════════════════════════════════
-const APP_VERSION = 'v1.0.8';
+const APP_VERSION = 'v1.0.9';
 
 // ══════════════════════════════════════════════════════════════
 //  AIRPORTS
@@ -1492,15 +1492,6 @@ async function trackFlightNumber() {
     let adsbAc = await fetchAdsbLive(variants, variants);
     if (signal.aborted) return;
 
-    // ── Step 1b: Try AirLabs if community feeds missed ──────────────
-    // AirLabs uses broader data sources (1000 free req/mo, key required).
-    // Only fires when community ADS-B returned nothing, to conserve quota.
-    if (!adsbAc && getAirlabsKey()) {
-      document.getElementById('fn-status').textContent = 'Trying AirLabs…';
-      adsbAc = await fetchAirlabs(raw, variants);
-      if (signal.aborted) return;
-    }
-
     // ── Step 2: Try OpenSky only if ADS-B didn't return route info ──
     // ADS-B gives live position but often lacks origin/dest airports.
     // OpenSky gives route history but is slow and rate-limited.
@@ -1522,7 +1513,7 @@ async function trackFlightNumber() {
 
     // Use only validated sources
     const validRecord = recordOk ? record : null;
-    const validAdsb   = adsbOk   ? adsbAc : null;
+    let   validAdsb   = adsbOk   ? adsbAc : null;
 
     let icao24  = validRecord?.icao24  || validAdsb?.hex   || null;
     let oIcao   = validRecord?.estDepartureAirport || validAdsb?.from_icao || validAdsb?.orig_icao || null;
@@ -1539,24 +1530,44 @@ async function trackFlightNumber() {
       if (signal.aborted) return;
 
       if (!scheduled) {
-        // Last resort: check our local known-routes database
-        const known = lookupKnownRoute(raw);
-        if (!known) {
-          document.getElementById('fn-status').textContent =
-            `✖ "${raw.toUpperCase()}" not found in any live or scheduled source.`;
-          showToast('Flight not found in any source', 'error');
-          return;
+        // ── Try AirLabs / proxy as paid fallback (after all free sources failed) ──
+        if (getAirlabsKey() || getProxyUrl()) {
+          document.getElementById('fn-status').textContent = 'Trying AirLabs…';
+          adsbAc = await fetchAirlabs(raw, variants);
+          if (signal.aborted) return;
+          if (adsbAc) {
+            // Re-validate the AirLabs result
+            const airlabsCs = (adsbAc.flight || '').trim().toUpperCase();
+            if (variants.includes(airlabsCs)) {
+              icao24 = adsbAc.hex || null;
+              oIcao  = adsbAc.from_icao || adsbAc.orig_icao || null;
+              dIcao  = adsbAc.to_icao   || adsbAc.dest_icao || null;
+              csFound = airlabsCs;
+              validAdsb = adsbAc;
+            }
+          }
         }
-        console.log('[SafeZone] Using known route from local database');
-        oIcao = known.oIcao;
-        dIcao = known.dIcao;
+
+        // Last resort: check our local known-routes database
+        if (!validAdsb) {
+          const known = lookupKnownRoute(raw);
+          if (!known) {
+            document.getElementById('fn-status').textContent =
+              `✖ "${raw.toUpperCase()}" not found in any live or scheduled source.`;
+            showToast('Flight not found in any source', 'error');
+            return;
+          }
+          console.log('[SafeZone] Using known route from local database');
+          oIcao = known.oIcao;
+          dIcao = known.dIcao;
+          csFound = variants[0] || raw.toUpperCase();
+          routeOnly = true;
+        }
+      } else {
+        oIcao = scheduled.oIcao;
+        dIcao = scheduled.dIcao;
         csFound = variants[0] || raw.toUpperCase();
         routeOnly = true;
-      } else {
-      oIcao = scheduled.oIcao;
-      dIcao = scheduled.dIcao;
-      csFound = variants[0] || raw.toUpperCase();
-      routeOnly = true;
       }
     }
     // If we have a record but no origin/dest, also try scheduled route + known routes
