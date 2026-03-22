@@ -716,6 +716,30 @@ async function fetchRealRoute(oIcao, dIcao) {
   }
 }
 
+// Lookup scheduled route for a flight number via external APIs.
+// Returns { oIcao, dIcao } or null.
+async function fetchScheduledRoute(rawCallsign) {
+  const variants = normalizeCallsign(rawCallsign);
+  // Try FlightPlanDatabase search with each callsign variant
+  for (const cs of variants) {
+    try {
+      const res = await fetch(
+        `https://api.flightplandatabase.com/search/plans?q=${encodeURIComponent(cs)}&limit=1`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!res.ok) continue;
+      const plans = await res.json();
+      if (!Array.isArray(plans) || !plans.length) continue;
+      const plan = plans[0];
+      if (plan.fromICAO && plan.toICAO) {
+        console.log('[SafeZone] Scheduled route found via FlightPlanDB:', plan.fromICAO, '→', plan.toICAO);
+        return { oIcao: plan.fromICAO, dIcao: plan.toICAO, route: plan.route };
+      }
+    } catch(e) { console.debug('[SafeZone] FlightPlanDB search failed for', cs, e.message); }
+  }
+  return null;
+}
+
 // ══════════════════════════════════════════════════════════════
 //  GREAT CIRCLE  (fallback only)
 // ══════════════════════════════════════════════════════════════
@@ -971,37 +995,50 @@ async function trackFlightNumber() {
     ]);
     if (signal.aborted) return;
 
-    if (!record && !adsbAc) {
-      document.getElementById('fn-status').textContent =
-        `✖ "${raw.toUpperCase()}" not found in OpenSky or ADS-B networks. `
-        + `Flight may not be currently tracked (oceanic gap, or not yet departed).`;
-      showToast('Flight not found in any live source', 'error');
-      return;
-    }
-
-    // ── Merge best data from both sources ────────────────────────
-    // Final safety check: verify the callsign we got is actually one we expected
+    // ── Validate callsigns from both sources ────────────────────
     const recordCs = record ? (record.callsign || '').trim().toUpperCase() : '';
     const adsbCs   = adsbAc ? (adsbAc.flight || '').trim().toUpperCase() : '';
     const recordOk = record && variants.includes(recordCs);
     const adsbOk   = adsbAc && variants.includes(adsbCs);
 
-    if (!recordOk && !adsbOk) {
-      console.warn('[SafeZone] Callsign mismatch — record:', recordCs, 'adsb:', adsbCs, 'expected:', variants);
-      document.getElementById('fn-status').textContent =
-        `✖ "${raw.toUpperCase()}" not found. APIs returned unrelated flights — filtered out.`;
-      showToast('Flight not found (mismatched results filtered)', 'error');
-      return;
-    }
-
-    // Use only the validated source(s)
+    // Use only validated sources
     const validRecord = recordOk ? record : null;
     const validAdsb   = adsbOk   ? adsbAc : null;
 
-    const icao24  = validRecord?.icao24  || validAdsb?.hex   || null;
-    const oIcao   = validRecord?.estDepartureAirport || validAdsb?.from_icao || validAdsb?.orig_icao || null;
-    const dIcao   = validRecord?.estArrivalAirport   || validAdsb?.to_icao   || validAdsb?.dest_icao || null;
-    const csFound = (validRecord?.callsign || validAdsb?.flight || raw).trim().toUpperCase();
+    let icao24  = validRecord?.icao24  || validAdsb?.hex   || null;
+    let oIcao   = validRecord?.estDepartureAirport || validAdsb?.from_icao || validAdsb?.orig_icao || null;
+    let dIcao   = validRecord?.estArrivalAirport   || validAdsb?.to_icao   || validAdsb?.dest_icao || null;
+    let csFound = (validRecord?.callsign || validAdsb?.flight || raw).trim().toUpperCase();
+    let routeOnly = false;   // true when we only have a scheduled route, no live data
+
+    // If no validated live data, try to fetch the scheduled route as fallback
+    if (!validRecord && !validAdsb) {
+      console.warn('[SafeZone] No validated live data — trying scheduled route fallback');
+      document.getElementById('fn-status').textContent = 'No live data — looking up scheduled route…';
+
+      const scheduled = await fetchScheduledRoute(raw);
+      if (signal.aborted) return;
+
+      if (!scheduled) {
+        document.getElementById('fn-status').textContent =
+          `✖ "${raw.toUpperCase()}" not found in any live or scheduled source.`;
+        showToast('Flight not found in any source', 'error');
+        return;
+      }
+      oIcao = scheduled.oIcao;
+      dIcao = scheduled.dIcao;
+      csFound = variants[0] || raw.toUpperCase();
+      routeOnly = true;
+    }
+    // If we have a record but no origin/dest, also try scheduled route
+    if (!oIcao || !dIcao) {
+      const scheduled = await fetchScheduledRoute(raw);
+      if (signal.aborted) return;
+      if (scheduled) {
+        oIcao = oIcao || scheduled.oIcao;
+        dIcao = dIcao || scheduled.dIcao;
+      }
+    }
 
     const lastSeenDate = validRecord?.lastSeen
       ? new Date(validRecord.lastSeen * 1000).toUTCString().slice(0, 22) + ' UTC'
@@ -1112,6 +1149,7 @@ async function trackFlightNumber() {
     document.getElementById('fn-airline').textContent =
       airline + (isAirborne
         ? `  ·  via ${dataSource}`
+        : routeOnly ? '  ·  scheduled route'
         : (lastSeenDate ? `  ·  last seen ${lastSeenDate}` : '  ·  not currently airborne'));
 
     const oLabel = oCoord ? `<span class="fn-ap">${esc(oCoord.iata)}</span>` : (oIcao ? `<span class="fn-ap">${esc(oIcao)}</span>` : '');
@@ -1126,13 +1164,16 @@ async function trackFlightNumber() {
         `<div>Speed <span>${velKmhDisp}</span></div>` +
         `<div>Hdg <span>${Math.round(track)}°</span></div>`;
     } else {
-      document.getElementById('fn-stats-row').innerHTML =
-        `<div style="color:var(--orange)">⬛ On ground / between flights</div>`;
+      document.getElementById('fn-stats-row').innerHTML = routeOnly
+        ? `<div style="color:var(--muted)">Scheduled route · no live position available</div>`
+        : `<div style="color:var(--orange)">⬛ On ground / between flights</div>`;
     }
 
     const statusTag = isAirborne
       ? `<span class="fn-tag fn-tag-ok">● Airborne · ${esc(dataSource)}</span>`
-      : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
+      : routeOnly
+        ? `<span class="fn-tag fn-tag-warn">◌ No live data · route only</span>`
+        : `<span class="fn-tag fn-tag-warn">⬛ On ground${lastSeenDate ? ' · ' + esc(lastSeenDate) : ''}</span>`;
     const routeTag = pts
       ? ` <span class="fn-tag ${routeIsReal ? 'fn-tag-ok' : 'fn-tag-warn'}" style="margin-left:4px">${routeIsReal ? '✔ IFR route' : '~ Great circle'}</span>`
       : '';
@@ -1143,7 +1184,9 @@ async function trackFlightNumber() {
 
     document.getElementById('fn-result-card').style.display = 'block';
     document.getElementById('fn-status').textContent = !isAirborne && pts
-      ? `Route shown from last recorded operation${lastSeenDate ? ' (' + lastSeenDate + ')' : ''}.`
+      ? (routeOnly
+          ? `Scheduled route shown — flight is not currently tracked on any live feed.`
+          : `Route shown from last recorded operation${lastSeenDate ? ' (' + lastSeenDate + ')' : ''}.`)
       : '';
 
     _activeFlightSearch = { callsign: raw, icao24, lat, lng };
@@ -1151,7 +1194,9 @@ async function trackFlightNumber() {
     showToast(
       isAirborne
         ? `Tracking ${csFound}${airline ? ' · ' + airline : ''}`
-        : `${csFound}${airline ? ' · ' + airline : ''} — on ground · route shown from last operation`,
+        : routeOnly
+          ? `${csFound}${airline ? ' · ' + airline : ''} — showing scheduled route`
+          : `${csFound}${airline ? ' · ' + airline : ''} — on ground · route shown from last operation`,
       isAirborne ? 'success' : 'info'
     );
 
